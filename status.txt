@@ -3,4 +3,10 @@ Release Summary:
 - Changes committed and pushed to 'bleeding' branch.
 - Tag '1.0.6' created and pushed to GitHub.
 - GitHub Action triggered for release build.
+
+Commands Used:
+1. git add . && git commit -m "chore: bump version to 1.0.6" && git push origin bleeding
+2. git tag 1.0.6 && git push origin 1.0.6
+3. git add status.txt && git commit -m "chore: update status.txt with release 1.0.6 info" && git push origin bleeding
+
 Date: 2026-03-23
