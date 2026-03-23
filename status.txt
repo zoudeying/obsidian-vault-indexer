@@ -1,6 +1,6 @@
-On branch bleeding
-Untracked files:
-  (use "git add <file>..." to include in what will be committed)
-	status.txt
-
-nothing added to commit but untracked files present (use "git add" to track)
+Release Summary:
+- Version bumped to 1.0.6 in manifest.json.
+- Changes committed and pushed to 'bleeding' branch.
+- Tag '1.0.6' created and pushed to GitHub.
+- GitHub Action triggered for release build.
+Date: 2026-03-23
