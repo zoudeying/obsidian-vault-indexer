@@ -157,12 +157,12 @@ var GlobalProxyPlugin = class extends import_obsidian.Plugin {
 		const httpProxy= isValidFormat(this.settings.httpProxy) ? ";http=" + this.settings.httpProxy : "";
 		const httpsProxy= isValidFormat(this.settings.httpsProxy) ? ";https=" + this.settings.httpsProxy : "";
 		if (isValidFormat(this.settings.socksProxy)) {
-			return this.settings.socksProxy + httpProxy + httpsProxy + ",direct://"
+			return this.settings.socksProxy + httpProxy + httpsProxy
 		} else if (!!httpProxy) {
-			return !!httpsProxy ? "http=" + this.settings.httpProxy + httpsProxy + ",direct://"
-				: this.settings.httpProxy + ",direct://"
+			return !!httpsProxy ? "http=" + this.settings.httpProxy + httpsProxy
+				: this.settings.httpProxy
 		} else if (!!httpsProxy) {
-			return this.settings.httpsProxy + ",direct://"
+			return this.settings.httpsProxy
 		}
 		
 		return undefined;
