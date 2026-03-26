@@ -1,9 +1,9 @@
 {
-	"id": "global-proxy",
-	"name": "Global Proxy",
+	"id": "vault-indexer",
+	"name": "Vault Indexer",
 	"version": "1.0.6",
 	"minAppVersion": "0.15.0",
-	"description": "Use network proxy throughout Obsidian according to the rules configured in this plugin.",
+	"description": "Index vault elements and manage local sync securely.",
 	"author": "windingblack",
 	"fundingUrl": "https://www.buymeacoffee.com/windingblack",
 	"authorUrl": "https://github.com/windingblack",
