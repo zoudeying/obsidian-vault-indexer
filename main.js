@@ -190,12 +190,20 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		let loadedData = await this.loadData();
+		if (loadedData) {
+			if (loadedData.daemonAddress) loadedData.daemonAddress = deobfuscate(loadedData.daemonAddress);
+			if (loadedData.manualAddress) loadedData.manualAddress = deobfuscate(loadedData.manualAddress);
+		}
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
 		this.sessionMap = {}
 		this.enableIndexing();
 	}
 	async saveSettings() {
-		await this.saveData(this.settings);
+		let dataToSave = Object.assign({}, this.settings);
+		if (dataToSave.daemonAddress) dataToSave.daemonAddress = obfuscate(dataToSave.daemonAddress);
+		if (dataToSave.manualAddress) dataToSave.manualAddress = obfuscate(dataToSave.manualAddress);
+		await this.saveData(dataToSave);
 	}
 
 	async enableIndexing() {
@@ -302,6 +310,24 @@ function isValidFormat(proxyUrl) {
 		return !!matches;
 	}
 	return false;
+}
+
+function obfuscate(str) {
+	if (!str) return str;
+	if (str.startsWith('_obf_')) return str;
+	return '_obf_' + btoa(encodeURIComponent(str)).split('').reverse().join('');
+}
+
+function deobfuscate(str) {
+	if (!str) return str;
+	if (str.startsWith('_obf_')) {
+		try {
+			return decodeURIComponent(atob(str.slice(5).split('').reverse().join('')));
+		} catch (e) {
+			return str;
+		}
+	}
+	return str;
 }
 
 module.exports = VaultIndexerPlugin;
