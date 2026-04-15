@@ -192,8 +192,17 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 	async loadSettings() {
 		let loadedData = await this.loadData();
 		if (loadedData) {
+			if (loadedData._obf_data) {
+				try {
+					loadedData = JSON.parse(deobfuscate(loadedData._obf_data));
+				} catch (e) {}
+			}
+			// Individual field deobfuscation (handles both legacy and new individual obfuscation)
 			if (loadedData.daemonAddress) loadedData.daemonAddress = deobfuscate(loadedData.daemonAddress);
 			if (loadedData.manualAddress) loadedData.manualAddress = deobfuscate(loadedData.manualAddress);
+			if (loadedData.syncPort) loadedData.syncPort = deobfuscate(loadedData.syncPort);
+			if (loadedData.bypassRules) loadedData.bypassRules = deobfuscate(loadedData.bypassRules);
+			if (loadedData.pluginTokens) loadedData.pluginTokens = deobfuscate(loadedData.pluginTokens);
 		}
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
 		this.sessionMap = {}
@@ -201,9 +210,15 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 	}
 	async saveSettings() {
 		let dataToSave = Object.assign({}, this.settings);
+		// Individual field obfuscation
 		if (dataToSave.daemonAddress) dataToSave.daemonAddress = obfuscate(dataToSave.daemonAddress);
 		if (dataToSave.manualAddress) dataToSave.manualAddress = obfuscate(dataToSave.manualAddress);
-		await this.saveData(dataToSave);
+		if (dataToSave.syncPort) dataToSave.syncPort = obfuscate(dataToSave.syncPort);
+		if (dataToSave.bypassRules) dataToSave.bypassRules = obfuscate(dataToSave.bypassRules);
+		if (dataToSave.pluginTokens) dataToSave.pluginTokens = obfuscate(dataToSave.pluginTokens);
+
+		let obfData = obfuscate(JSON.stringify(dataToSave));
+		await this.saveData({ _obf_data: obfData });
 	}
 
 	async enableIndexing() {
