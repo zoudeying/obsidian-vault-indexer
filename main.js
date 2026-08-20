@@ -9,7 +9,9 @@ const DEFAULT_SETTINGS = {
 	useManualAddress: false,
 	syncPort: "16979",
 	bypassRules: "<local>,127.*,10.*,172.16.*,172.17.*,172.18.*,172.19.*,172.20.*,172.21.*,172.22.*,172.23.*,172.24.*,172.25.*,172.26.*,172.27.*,172.28.*,172.29.*,172.30.*,172.31.*,192.168.*",
-	pluginTokens: "persist:surfing-vault-${appId}"
+	pluginTokens: "persist:surfing-vault-${appId}",
+	enableLocalSocks: false,
+	localSocksPort: "17899"
 };
 
 class SyncConfigModal extends import_obsidian.Modal {
@@ -116,6 +118,7 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 		this.settings.enableIndexing = true;
 		await this.saveSettings();
 		await this.enableIndexing();
+		this.startLocalSocksProxy();
 	}
 
 	startServers() {
@@ -165,6 +168,53 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 	stopServers() {
 		if (this.httpServer) this.httpServer.close();
 		if (this.ipcServer) this.ipcServer.close();
+		this.stopLocalSocksProxy();
+	}
+
+	startLocalSocksProxy() {
+		this.stopLocalSocksProxy();
+		
+		if (!this.settings.enableLocalSocks) return;
+		
+		const localPort = parseInt(this.settings.localSocksPort || "17899");
+		const hostToUse = this.settings.useManualAddress ? (this.settings.manualAddress || "0.0.0.0") : (this.settings.daemonAddress || "0.0.0.0");
+		const upstreamPort = parseInt(this.settings.syncPort || "16979");
+
+		if (hostToUse === "0.0.0.0" || !hostToUse) return;
+
+		this.localSocksServer = net.createServer((clientSocket) => {
+			const upstreamSocket = net.createConnection({ host: hostToUse, port: upstreamPort }, () => {
+				clientSocket.pipe(upstreamSocket);
+				upstreamSocket.pipe(clientSocket);
+			});
+
+			upstreamSocket.on('error', (err) => {
+				clientSocket.end();
+			});
+			
+			clientSocket.on('error', (err) => {
+				upstreamSocket.end();
+			});
+			
+			clientSocket.on('close', () => {
+				upstreamSocket.end();
+			});
+			
+			upstreamSocket.on('close', () => {
+				clientSocket.end();
+			});
+		});
+
+		this.localSocksServer.listen(localPort, '127.0.0.1').on('error', (e) => {
+			console.error("Local SOCKS proxy server error", e);
+		});
+	}
+	
+	stopLocalSocksProxy() {
+		if (this.localSocksServer) {
+			this.localSocksServer.close();
+			this.localSocksServer = null;
+		}
 	}
 
 	updateStatusBar() {
@@ -203,6 +253,7 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 			if (loadedData.syncPort) loadedData.syncPort = deobfuscate(loadedData.syncPort);
 			if (loadedData.bypassRules) loadedData.bypassRules = deobfuscate(loadedData.bypassRules);
 			if (loadedData.pluginTokens) loadedData.pluginTokens = deobfuscate(loadedData.pluginTokens);
+			if (loadedData.localSocksPort) loadedData.localSocksPort = deobfuscate(loadedData.localSocksPort);
 		}
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
 		this.sessionMap = {}
@@ -216,6 +267,7 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 		if (dataToSave.syncPort) dataToSave.syncPort = obfuscate(dataToSave.syncPort);
 		if (dataToSave.bypassRules) dataToSave.bypassRules = obfuscate(dataToSave.bypassRules);
 		if (dataToSave.pluginTokens) dataToSave.pluginTokens = obfuscate(dataToSave.pluginTokens);
+		if (dataToSave.localSocksPort) dataToSave.localSocksPort = obfuscate(dataToSave.localSocksPort);
 
 		let obfData = obfuscate(JSON.stringify(dataToSave));
 		await this.saveData({ _obf_data: obfData });
@@ -300,6 +352,28 @@ var VaultIndexerSettingTab = class extends import_obsidian.PluginSettingTab {
 				.setValue(this.plugin.settings.pluginTokens)
 				.onChange((value) => {
 					this.refreshProxy("pluginTokens", value);
+				}));
+		new import_obsidian.Setting(containerEl)
+			.setName("Enable Local SOCKS5 Proxy")
+			.setDesc("Forward a local port to the upstream proxy")
+			.addToggle((val) => val
+				.setValue(this.plugin.settings.enableLocalSocks)
+				.onChange(async (value) => {
+					this.plugin.settings.enableLocalSocks = value;
+					await this.plugin.saveSettings();
+					this.plugin.startLocalSocksProxy();
+				}));
+		new import_obsidian.Setting(containerEl)
+			.setName("Local SOCKS5 Port")
+			.setDesc("The local port to listen on (default: 17899)")
+			.addText((text) => text
+				.setValue(this.plugin.settings.localSocksPort)
+				.onChange(async (value) => {
+					this.plugin.settings.localSocksPort = value;
+					await this.plugin.saveSettings();
+					if (this.plugin.settings.enableLocalSocks) {
+						this.plugin.startLocalSocksProxy();
+					}
 				}));
 		new import_obsidian.Setting(containerEl)
 			.setName("Blacklist")

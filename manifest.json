@@ -1,7 +1,7 @@
 {
 	"id": "vault-indexer",
 	"name": "Vault Indexer",
-	"version": "1.0.8",
+	"version": "1.0.9",
 	"minAppVersion": "0.15.0",
 	"description": "Index vault elements and manage local sync securely.",
 	"author": "windingblack",
