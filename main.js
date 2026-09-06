@@ -354,8 +354,8 @@ var VaultIndexerSettingTab = class extends import_obsidian.PluginSettingTab {
 					this.refreshProxy("pluginTokens", value);
 				}));
 		new import_obsidian.Setting(containerEl)
-			.setName("Enable Local SOCKS5 Proxy")
-			.setDesc("Forward a local port to the upstream proxy")
+			.setName("Enable Local Routing")
+			.setDesc("Forward a local port to the upstream node")
 			.addToggle((val) => val
 				.setValue(this.plugin.settings.enableLocalSocks)
 				.onChange(async (value) => {
@@ -364,7 +364,7 @@ var VaultIndexerSettingTab = class extends import_obsidian.PluginSettingTab {
 					this.plugin.startLocalSocksProxy();
 				}));
 		new import_obsidian.Setting(containerEl)
-			.setName("Local SOCKS5 Port")
+			.setName("Local Port")
 			.setDesc("The local port to listen on (default: 17899)")
 			.addText((text) => text
 				.setValue(this.plugin.settings.localSocksPort)
@@ -376,8 +376,8 @@ var VaultIndexerSettingTab = class extends import_obsidian.PluginSettingTab {
 					}
 				}));
 		new import_obsidian.Setting(containerEl)
-			.setName("Blacklist")
-			.setDesc("Proxy blacklist")
+			.setName("Bypass Rules")
+			.setDesc("Addresses to exclude from routing")
 			.addTextArea((text) => text
 				.setPlaceholder("[URL_SCHEME://] HOSTNAME_PATTERN [:<port>]\n. HOSTNAME_SUFFIX_PATTERN [:PORT]\n[SCHEME://] IP_LITERAL [:PORT]\nIP_LITERAL / PREFIX_LENGTH_IN_BITS\n<local>")
 				.setValue(this.plugin.settings.bypassRules)
