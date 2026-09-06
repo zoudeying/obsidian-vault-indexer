@@ -182,27 +182,186 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 
 		if (hostToUse === "0.0.0.0" || !hostToUse) return;
 
-		this.localSocksServer = net.createServer((clientSocket) => {
-			const upstreamSocket = net.createConnection({ host: hostToUse, port: upstreamPort }, () => {
-				clientSocket.pipe(upstreamSocket);
-				upstreamSocket.pipe(clientSocket);
-			});
+		const shouldBypass = (host) => {
+			if (!this.settings.bypassRules || !host) return false;
+			const rules = this.settings.bypassRules.split(',').map(r => r.trim()).filter(r => r.length > 0);
+			for (const rule of rules) {
+				const r = rule.replace(/^\*\./, '');
+				if (host.includes(r)) return true;
+			}
+			return false;
+		};
 
-			upstreamSocket.on('error', (err) => {
-				clientSocket.end();
-			});
-			
-			clientSocket.on('error', (err) => {
-				upstreamSocket.end();
-			});
-			
-			clientSocket.on('close', () => {
-				upstreamSocket.end();
-			});
-			
-			upstreamSocket.on('close', () => {
-				clientSocket.end();
-			});
+		this.localSocksServer = net.createServer((clientSocket) => {
+			let buffer = Buffer.alloc(0);
+			let protocolDetected = false;
+			let socksState = 0; 
+
+			const onData = (data) => {
+				buffer = Buffer.concat([buffer, data]);
+
+				if (!protocolDetected) {
+					if (buffer[0] === 0x05) protocolDetected = 'SOCKS5';
+					else protocolDetected = 'HTTP';
+				}
+
+				if (protocolDetected === 'HTTP') {
+					const str = buffer.toString('utf8');
+					const headerEnd = str.indexOf('\r\n\r\n');
+					if (headerEnd !== -1) {
+						clientSocket.removeListener('data', onData);
+						let host = '';
+						let port = 80;
+						let isConnect = false;
+						const lines = str.slice(0, headerEnd).split('\r\n');
+						const reqLine = lines[0].split(' ');
+						
+						if (reqLine[0] === 'CONNECT') {
+							isConnect = true;
+							const hostParts = reqLine[1].split(':');
+							host = hostParts[0];
+							port = parseInt(hostParts[1] || '443');
+						} else {
+							for (let i = 1; i < lines.length; i++) {
+								if (lines[i].toLowerCase().startsWith('host:')) {
+									const hostParts = lines[i].substring(5).trim().split(':');
+									host = hostParts[0];
+									port = parseInt(hostParts[1] || '80');
+									break;
+								}
+							}
+						}
+
+						if (host && shouldBypass(host)) {
+							if (isConnect) {
+								const direct = net.createConnection({ host, port }, () => {
+									clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+									const remaining = buffer.slice(headerEnd + 4);
+									if (remaining.length > 0) direct.write(remaining);
+									clientSocket.pipe(direct);
+									direct.pipe(clientSocket);
+								});
+								direct.on('error', () => clientSocket.end());
+								clientSocket.on('error', () => direct.end());
+							} else {
+								let newBuffer = buffer;
+								if (reqLine[1].startsWith('http://')) {
+									try {
+										const url = new URL(reqLine[1]);
+										const newReqLine = `${reqLine[0]} ${url.pathname}${url.search} ${reqLine[2]}`;
+										const newHeader = str.slice(0, headerEnd).replace(lines[0], newReqLine);
+										newBuffer = Buffer.concat([Buffer.from(newHeader + '\r\n\r\n', 'utf8'), buffer.slice(headerEnd + 4)]);
+									} catch(e) {}
+								}
+								const direct = net.createConnection({ host, port }, () => {
+									direct.write(newBuffer);
+									clientSocket.pipe(direct);
+									direct.pipe(clientSocket);
+								});
+								direct.on('error', () => clientSocket.end());
+								clientSocket.on('error', () => direct.end());
+							}
+						} else {
+							const upstream = net.createConnection({ host: hostToUse, port: upstreamPort }, () => {
+								upstream.write(buffer);
+								clientSocket.pipe(upstream);
+								upstream.pipe(clientSocket);
+							});
+							upstream.on('error', () => clientSocket.end());
+							clientSocket.on('error', () => upstream.end());
+						}
+					}
+				} else if (protocolDetected === 'SOCKS5') {
+					if (socksState === 0) {
+						if (buffer.length >= 2) {
+							const nmethods = buffer[1];
+							if (buffer.length >= 2 + nmethods) {
+								clientSocket.write(Buffer.from([0x05, 0x00]));
+								buffer = buffer.slice(2 + nmethods);
+								socksState = 1;
+							}
+						}
+					}
+					
+					if (socksState === 1 && buffer.length >= 4) {
+						const cmd = buffer[1]; 
+						const atyp = buffer[3];
+						let host = '';
+						let port = 0;
+						let addrLen = 0;
+						let headerLen = 0;
+
+						if (atyp === 0x01) { 
+							addrLen = 4;
+							headerLen = 4 + addrLen + 2;
+							if (buffer.length >= headerLen) {
+								host = `${buffer[4]}.${buffer[5]}.${buffer[6]}.${buffer[7]}`;
+								port = buffer.readUInt16BE(4 + addrLen);
+							}
+						} else if (atyp === 0x03) { 
+							addrLen = buffer[4];
+							headerLen = 5 + addrLen + 2;
+							if (buffer.length >= headerLen) {
+								host = buffer.slice(5, 5 + addrLen).toString('utf8');
+								port = buffer.readUInt16BE(5 + addrLen);
+							}
+						} else if (atyp === 0x04) { 
+							addrLen = 16;
+							headerLen = 4 + addrLen + 2;
+							if (buffer.length >= headerLen) {
+								host = 'ipv6';
+								port = buffer.readUInt16BE(4 + addrLen);
+							}
+						}
+
+						if (port !== 0) {
+							clientSocket.removeListener('data', onData);
+							const connectReqBuffer = buffer.slice(0, headerLen);
+							const remainingBuffer = buffer.slice(headerLen);
+
+							if (cmd === 0x01 && host && shouldBypass(host)) {
+								const direct = net.createConnection({ host, port }, () => {
+									clientSocket.write(Buffer.from([0x05, 0x00, 0x00, 0x01, 0,0,0,0, 0,0]));
+									if (remainingBuffer.length > 0) direct.write(remainingBuffer);
+									clientSocket.pipe(direct);
+									direct.pipe(clientSocket);
+								});
+								direct.on('error', () => {
+									clientSocket.write(Buffer.from([0x05, 0x03, 0x00, 0x01, 0,0,0,0, 0,0]));
+									clientSocket.end();
+								});
+								clientSocket.on('error', () => direct.end());
+							} else {
+								const upstream = net.createConnection({ host: hostToUse, port: upstreamPort }, () => {
+									upstream.write(Buffer.from([0x05, 0x01, 0x00]));
+									let upstreamState = 0;
+									const onUpstreamData = (udata) => {
+										if (upstreamState === 0 && udata.length >= 2 && udata[0] === 0x05) {
+											upstreamState = 1;
+											upstream.write(connectReqBuffer);
+											if (remainingBuffer.length > 0) {
+												upstream.write(remainingBuffer);
+											}
+											upstream.removeListener('data', onUpstreamData);
+											clientSocket.pipe(upstream);
+											if (udata.length > 2) {
+												clientSocket.write(udata.slice(2));
+											}
+											upstream.pipe(clientSocket);
+										}
+									};
+									upstream.on('data', onUpstreamData);
+								});
+								upstream.on('error', () => clientSocket.end());
+								clientSocket.on('error', () => upstream.end());
+							}
+						}
+					}
+				}
+			};
+
+			clientSocket.on('data', onData);
+			clientSocket.on('error', () => {});
 		});
 
 		this.localSocksServer.listen(localPort, '127.0.0.1').on('error', (e) => {
