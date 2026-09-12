@@ -1,23 +1,23 @@
-.proxy-status {
+.indexer-status {
   cursor: pointer;
   padding: 0 8px;
   transition: background-color 0.2s ease;
 }
 
-.proxy-status:hover {
+.indexer-status:hover {
   background-color: var(--interactive-hover);
   border-radius: 4px;
 }
 
-.proxy-enabled {
+.indexer-enabled {
   color: var(--text-success);
   font-weight: bold;
 }
 
-.proxy-disabled {
+.indexer-disabled {
   color: var(--text-muted);
 }
 
-.proxy-enabled:hover, .proxy-disabled:hover {
+.indexer-enabled:hover, .indexer-disabled:hover {
   text-decoration: underline;
 } 
