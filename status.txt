@@ -1,15 +1,14 @@
 Release Summary:
-- Version bumped to 1.2.0 in manifest.json.
-- Architecture refactored: removed monitor.exe daemon, proxy always on, PAC setting always unified with no blackhole.
-- NetSetMan runs tiny pure-python notify.py on connection.
-- Vault Indexer executes check_network.py to perform SSID check and gateway IP gathering with configurable override.
+- Version bumped to 1.2.1 in manifest.json.
+- Settings panel enriched with all switches: Master Enable Indexing, Manual Node Override toggle, NetSetMan Notification Listener toggle, Auto-detect Gateway on Notify ON toggle, and Local Routing toggle.
+- Added notify on and notify off handling across NetSetMan scripts and Vault Indexer IPC listener.
 - Changes committed and pushed to 'bleeding' branch.
-- Tag '1.2.0' created and pushed to GitHub.
+- Tag '1.2.1' created and pushed to GitHub.
 - GitHub Action triggered for release build.
 
 Commands Used:
-1. git add . && git commit -m "feat: simplified architecture with pure python notifier and checker" && git push origin bleeding
-2. git tag 1.2.0 && git push origin 1.2.0
-3. git add status.txt && git commit -m "chore: update status.txt with release 1.2.0 info" && git push origin bleeding
+1. git add . && git commit -m "feat: complete setting panel switches and notify on/off support" && git push origin bleeding
+2. git tag 1.2.1 && git push origin 1.2.1
+3. git add status.txt && git commit -m "chore: update status.txt with release 1.2.1 info" && git push origin bleeding
 
 Date: 2026-09-28

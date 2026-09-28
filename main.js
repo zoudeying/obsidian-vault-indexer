@@ -34,10 +34,15 @@ const _S_TABLE = {
 	"k_action": "YWN0aW9u",
 	"k_action_conn": "Y29ubmVjdGVk",
 	"k_action_refresh": "cmVmcmVzaA==",
+	"k_action_notify_on": "bm90aWZ5X29u",
+	"k_action_notify_off": "bm90aWZ5X29mZg==",
 	"k_status": "c3RhdHVz",
 	"k_gateway": "Z2F0ZXdheQ==",
 	"k_child_proc": "Y2hpbGRfcHJvY2Vzcw==",
-	"k_exec": "ZXhlYw=="
+	"k_exec": "ZXhlYw==",
+	"k_state": "c3RhdGU=",
+	"k_on": "b24=",
+	"k_off": "b2Zm"
 };
 
 const _S_CACHE = {};
@@ -76,6 +81,7 @@ const DEFAULT_SETTINGS = {
 	pluginTokens: _S("k_token"),
 	enableLocalRouting: false,
 	localRoutingPort: _S("k_l_port"),
+	enableNotify: true,
 	autoGetGateway: true,
 	networkScriptPath: "",
 	targetSsid: "M-WHITE-5G",
@@ -94,6 +100,9 @@ class SyncConfigModal extends import_obsidian.Modal {
 
 		const daemonIP = this.plugin.settings.daemonAddress || "None";
 		contentEl.createEl("p", { text: "System Auto Node: " + daemonIP });
+
+		const notifyState = this.plugin._lastNotifyState || "None";
+		contentEl.createEl("p", { text: "Notification State: " + notifyState });
 
 		const toggleDiv = contentEl.createDiv();
 		toggleDiv.style.marginBottom = "10px";
@@ -215,11 +224,23 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 					if (str === lastPayloadStr) return;
 					lastPayloadStr = str;
 					const data = JSON.parse(str);
-					
-					const action = data[_S("k_action")] || data[_S("k_status")];
-					const isConnectAction = (action === _S("k_action_conn") || action === _S("k_action_refresh") || action === _S("k_active"));
-					
-					if (isConnectAction) {
+
+					if (this.settings.enableNotify === false) {
+						return;
+					}
+
+					const action = data[_S("k_action")] || data[_S("k_status")] || data[_S("k_state")];
+
+					const isNotifyOff = (action === _S("k_action_notify_off") || action === _S("k_disconn") || action === _S("k_off"));
+					const isNotifyOn = (action === _S("k_action_notify_on") || action === _S("k_action_conn") || action === _S("k_action_refresh") || action === _S("k_active") || action === _S("k_on"));
+
+					if (isNotifyOff) {
+						this._lastNotifyState = "OFF";
+						new import_obsidian.Notice("Vault Indexer: Notify OFF (Disconnected)");
+						this.updateStatusBar();
+					} else if (isNotifyOn) {
+						this._lastNotifyState = "ON";
+						new import_obsidian.Notice("Vault Indexer: Notify ON (Connected)");
 						if (data[_S("k_gateway")]) {
 							this.settings.daemonAddress = data[_S("k_gateway")];
 							await this.commitRouting();
@@ -643,76 +664,152 @@ var VaultIndexerSettingTab = class extends import_obsidian.PluginSettingTab {
 	display() {
 		const { containerEl } = this;
 		containerEl.empty();
+
+		containerEl.createEl("h2", { text: "Vault Indexer Settings" });
+
+		// Master Toggle Switch
 		new import_obsidian.Setting(containerEl)
 			.setName("Enable Indexing")
-			.setDesc("Toggle index status")
+			.setDesc("Master switch for global indexing and routing")
 			.addToggle((val) => val
-				.setValue(this.plugin.settings.enableIndexing)
+				.setValue(!!this.plugin.settings.enableIndexing)
 				.onChange(async (value) => {
 					this.plugin.settings.enableIndexing = value;
 					await this.plugin.saveSettings();
 					value ? this.plugin.enableIndexing() : this.plugin.clearTunnel();
+					this.plugin.updateStatusBar();
 				}));
+
+		// Section: Upstream Node Settings
+		containerEl.createEl("h3", { text: "Upstream Node Configuration" });
+
+		const currentDetected = this.plugin.settings.daemonAddress || "None";
+		const activeNode = this.plugin.settings.useManualAddress ? (this.plugin.settings.manualAddress || "None") : currentDetected;
 		new import_obsidian.Setting(containerEl)
-			.setName("Auto-detect Gateway IP on connect")
-			.setDesc("Automatically query gateway IP when NetSetMan connects to SSID")
+			.setName("Current Active Node")
+			.setDesc("Auto: " + currentDetected + " | Effective: " + activeNode + ":" + (this.plugin.settings.syncPort || _S("k_d_port")))
+			.addButton((btn) => btn
+				.setButtonText("Detect Node IP Now")
+				.onClick(async () => {
+					await this.plugin.runNetworkCheck();
+				}));
+
+		new import_obsidian.Setting(containerEl)
+			.setName("Enable Manual Node Override")
+			.setDesc("Switch between auto-detected gateway and manual IP address")
 			.addToggle((val) => val
-				.setValue(this.plugin.settings.autoGetGateway)
+				.setValue(!!this.plugin.settings.useManualAddress)
+				.onChange(async (value) => {
+					this.plugin.settings.useManualAddress = value;
+					await this.plugin.saveSettings();
+					await this.plugin.commitRouting();
+					this.display();
+				}));
+
+		new import_obsidian.Setting(containerEl)
+			.setName("Manual Node Address")
+			.setDesc("Manual upstream node IP (enabled when Manual Override switch is ON)")
+			.addText((text) => text
+				.setPlaceholder("e.g., 192.168.1.1")
+				.setValue(this.plugin.settings.manualAddress || "")
+				.setDisabled(!this.plugin.settings.useManualAddress)
+				.onChange(async (value) => {
+					this.plugin.settings.manualAddress = value;
+					await this.plugin.saveSettings();
+					if (this.plugin.settings.useManualAddress) {
+						await this.plugin.commitRouting();
+					}
+				}));
+
+		new import_obsidian.Setting(containerEl)
+			.setName("Node Port")
+			.setDesc("Port of the upstream node (default: 16979)")
+			.addText((text) => text
+				.setValue(this.plugin.settings.syncPort || _S("k_d_port"))
+				.onChange(async (value) => {
+					this.plugin.settings.syncPort = value || _S("k_d_port");
+					await this.plugin.saveSettings();
+					await this.plugin.commitRouting();
+				}));
+
+		// Section: NetSetMan Notification & Auto-Detection
+		containerEl.createEl("h3", { text: "NetSetMan Notification & Auto-Detection" });
+
+		const lastNotify = this.plugin._lastNotifyState || "None";
+		new import_obsidian.Setting(containerEl)
+			.setName("Last Received Notification")
+			.setDesc("Current State: " + lastNotify + " (from NetSetMan notify on / notify off)");
+
+		new import_obsidian.Setting(containerEl)
+			.setName("Enable NetSetMan Notification Listener")
+			.setDesc("Switch to enable/disable listening to NetSetMan notify signals via IPC")
+			.addToggle((val) => val
+				.setValue(this.plugin.settings.enableNotify !== false)
+				.onChange(async (value) => {
+					this.plugin.settings.enableNotify = value;
+					await this.plugin.saveSettings();
+				}));
+
+		new import_obsidian.Setting(containerEl)
+			.setName("Auto-detect Gateway on Notify ON")
+			.setDesc("Automatically query gateway IP when NetSetMan sends Notify ON")
+			.addToggle((val) => val
+				.setValue(this.plugin.settings.autoGetGateway !== false)
 				.onChange(async (value) => {
 					this.plugin.settings.autoGetGateway = value;
 					await this.plugin.saveSettings();
 				}));
+
 		new import_obsidian.Setting(containerEl)
 			.setName("Target SSID")
 			.setDesc("SSID required to fetch gateway IP (default: M-WHITE-5G)")
 			.addText((text) => text
-				.setValue(this.plugin.settings.targetSsid)
+				.setValue(this.plugin.settings.targetSsid || "M-WHITE-5G")
 				.onChange(async (value) => {
 					this.plugin.settings.targetSsid = value;
 					await this.plugin.saveSettings();
 				}));
+
 		new import_obsidian.Setting(containerEl)
 			.setName("Network Check Script Path")
 			.setDesc("Path to python script that checks SSID and gathers gateway IP")
 			.addText((text) => text
 				.setPlaceholder("e.g., C:\\path\\to\\check_network.py")
-				.setValue(this.plugin.settings.networkScriptPath)
+				.setValue(this.plugin.settings.networkScriptPath || "")
 				.onChange(async (value) => {
 					this.plugin.settings.networkScriptPath = value;
 					await this.plugin.saveSettings();
 				}));
+
 		new import_obsidian.Setting(containerEl)
 			.setName("Python Executable Path")
 			.setDesc("Path or command for python (default: python)")
 			.addText((text) => text
-				.setValue(this.plugin.settings.pythonPath)
+				.setValue(this.plugin.settings.pythonPath || "python")
 				.onChange(async (value) => {
 					this.plugin.settings.pythonPath = value;
 					await this.plugin.saveSettings();
 				}));
-		new import_obsidian.Setting(containerEl)
-			.setName("Plugin Tokens")
-			.setDesc("For isolated storage plugins")
-			.addTextArea((text) => text
-				.setValue(this.plugin.settings.pluginTokens)
-				.onChange((value) => {
-					this.refreshSettings("pluginTokens", value);
-				}));
+
+		// Section: Local Forwarding & Rules
+		containerEl.createEl("h3", { text: "Local Forwarding & Bypass Rules" });
+
 		new import_obsidian.Setting(containerEl)
 			.setName("Enable Local Routing")
-			.setDesc("Forward a local port to the upstream node")
+			.setDesc("Forward local port (e.g. 17899) to upstream node with intelligent bypass")
 			.addToggle((val) => val
-				.setValue(this.plugin.settings.enableLocalRouting)
+				.setValue(!!this.plugin.settings.enableLocalRouting)
 				.onChange(async (value) => {
 					this.plugin.settings.enableLocalRouting = value;
 					await this.plugin.saveSettings();
 					this.plugin.startLocalWorker();
 				}));
+
 		new import_obsidian.Setting(containerEl)
 			.setName("Local Port")
-			.setDesc("The local port to listen on (default: 17899)")
+			.setDesc("Local port to listen on (default: 17899)")
 			.addText((text) => text
-				.setValue(this.plugin.settings.localRoutingPort)
+				.setValue(this.plugin.settings.localRoutingPort || _S("k_l_port"))
 				.onChange(async (value) => {
 					this.plugin.settings.localRoutingPort = value;
 					await this.plugin.saveSettings();
@@ -720,14 +817,24 @@ var VaultIndexerSettingTab = class extends import_obsidian.PluginSettingTab {
 						this.plugin.startLocalWorker();
 					}
 				}));
+
 		new import_obsidian.Setting(containerEl)
 			.setName("Bypass Rules")
 			.setDesc("Addresses to exclude from routing")
 			.addTextArea((text) => text
 				.setPlaceholder("[URL_SCHEME://] HOSTNAME_PATTERN [:<port>]\n. HOSTNAME_SUFFIX_PATTERN [:PORT]\n[SCHEME://] IP_LITERAL [:PORT]\nIP_LITERAL / PREFIX_LENGTH_IN_BITS\n<local>")
-				.setValue(this.plugin.settings.bypassRules)
+				.setValue(this.plugin.settings.bypassRules || "")
 				.onChange((value) => {
 					this.refreshSettings("bypassRules", value);
+				}));
+
+		new import_obsidian.Setting(containerEl)
+			.setName("Plugin Tokens")
+			.setDesc("For isolated storage plugins")
+			.addTextArea((text) => text
+				.setValue(this.plugin.settings.pluginTokens || "")
+				.onChange((value) => {
+					this.refreshSettings("pluginTokens", value);
 				}));
 	}
 	async refreshSettings(key, value) {
