@@ -1,34 +1,43 @@
 var import_obsidian = require("obsidian");
 const http = require('http');
 const net = require('net');
+const child_process = require('child_process');
 
 // Dynamic String Resolver
 const _S_TABLE = {
-	k_init: "MC4wLjAuMA==",
-	k_loop: "MTI3LjAuMC4x",
-	k_d_port: "MTY5Nzk=",
-	k_l_port: "MTc4OTk=",
-	k_rules: "PGxvY2FsPiwxMjcuKiwxMC4qLDE3Mi4xNi4qLDE3Mi4xNy4qLDE3Mi4xOC4qLDE3Mi4xOS4qLDE3Mi4yMC4qLDE3Mi4yMS4qLDE3Mi4yMi4qLDE3Mi4yMy4qLDE3Mi4yNC4qLDE3Mi4yNS4qLDE3Mi4yNi4qLDE3Mi4yNy4qLDE3Mi4yOC4qLDE3Mi4yOS4qLDE3Mi4zMC4qLDE3Mi4zMS4qLDE5Mi4xNjguKg==",
-	k_token: "cGVyc2lzdDpzdXJmaW5nLXZhdWx0LSR7YXBwSWR9",
-	s_cfg_path: "L3Byb3h5LnBhYw==",
-	s_cfg_mime: "YXBwbGljYXRpb24veC1ucy1wcm94eS1hdXRvY29uZmln",
-	s_pipe: "XFwuXHBpcGVcb2JzaWRpYW4taW5kZXhlci1pcGM=",
-	s_p_proto: "c29ja3M1Oi8v",
-	s_p_cfg_proto: "U09DS1M1IA==",
-	s_conn_resp: "SFRUUC8xLjEgMjAwIENvbm5lY3Rpb24gRXN0YWJsaXNoZWQNCg0K",
-	s_cfg_fn_head: "ZnVuY3Rpb24gRmluZFByb3h5Rm9yVVJMKHVybCwgaG9zdCkgeyByZXR1cm4gJw==",
-	s_cfg_fn_tail: "JzsgfQ==",
-	s_active: "YWN0aXZl",
-	s_disconn: "ZGlzY29ubmVjdGVk",
-	k_rem: "cmVtb3Rl",
-	k_sess: "c2Vzc2lvbg==",
-	k_def_sess: "ZGVmYXVsdFNlc3Npb24=",
-	k_from_part: "ZnJvbVBhcnRpdGlvbg==",
-	k_set_p: "c2V0UHJveHk=",
-	k_close_conns: "Y2xvc2VBbGxDb25uZWN0aW9ucw==",
-	k_p_rules: "cHJveHlSdWxlcw==",
-	k_p_bypass: "cHJveHlCeXBhc3NSdWxlcw==",
-	k_content_type: "Q29udGVudC1UeXBl"
+	"k_init": "MC4wLjAuMA==",
+	"k_loop": "MTI3LjAuMC4x",
+	"k_d_port": "MTY5Nzk=",
+	"k_l_port": "MTc4OTk=",
+	"k_rules": "PGxvY2FsPiwxMjcuKiwxMC4qLDE3Mi4xNi4qLDE3Mi4xNy4qLDE3Mi4xOC4qLDE3Mi4xOS4qLDE3Mi4yMC4qLDE3Mi4yMS4qLDE3Mi4yMi4qLDE3Mi4yMy4qLDE3Mi4yNC4qLDE3Mi4yNS4qLDE3Mi4yNi4qLDE3Mi4yNy4qLDE3Mi4yOC4qLDE3Mi4yOS4qLDE3Mi4zMC4qLDE3Mi4zMS4qLDE5Mi4xNjguKg==",
+	"k_token": "cGVyc2lzdDpzdXJmaW5nLXZhdWx0LSR7YXBwSWR9",
+	"s_cfg_path": "L3Byb3h5LnBhYw==",
+	"s_cfg_mime": "YXBwbGljYXRpb24veC1ucy1wcm94eS1hdXRvY29uZmln",
+	"s_pipe": "XFwuXHBpcGVcb2JzaWRpYW4taW5kZXhlci1pcGM=",
+	"s_p_proto": "c29ja3M1Oi8v",
+	"s_p_cfg_proto": "U09DS1M1IA==",
+	"s_conn_resp": "SFRUUC8xLjEgMjAwIENvbm5lY3Rpb24gRXN0YWJsaXNoZWQNCg0K",
+	"s_cfg_fn_head": "ZnVuY3Rpb24gRmluZFByb3h5Rm9yVVJMKHVybCwgaG9zdCkgeyByZXR1cm4gJw==",
+	"s_cfg_fn_tail": "JzsgfQ==",
+	"s_active": "YWN0aXZl",
+	"s_disconn": "ZGlzY29ubmVjdGVk",
+	"k_rem": "cmVtb3Rl",
+	"k_sess": "c2Vzc2lvbg==",
+	"k_def_sess": "ZGVmYXVsdFNlc3Npb24=",
+	"k_from_part": "ZnJvbVBhcnRpdGlvbg==",
+	"k_set_p": "c2V0UHJveHk=",
+	"k_close_conns": "Y2xvc2VBbGxDb25uZWN0aW9ucw==",
+	"k_p_rules": "cHJveHlSdWxlcw==",
+	"k_p_bypass": "cHJveHlCeXBhc3NSdWxlcw==",
+	"k_content_type": "Q29udGVudC1UeXBl",
+	"s_routing_template": "dmFyIEZpbmRQcm94eUZvclVSTCA9IGZ1bmN0aW9uKGluaXQsIHByb2ZpbGVzKSB7CiAgICByZXR1cm4gZnVuY3Rpb24odXJsLCBob3N0KSB7CiAgICAgICAgInVzZSBzdHJpY3QiOwogICAgICAgIHZhciByZXN1bHQgPSBpbml0LCBzY2hlbWUgPSB1cmwuc3Vic3RyKDAsIHVybC5pbmRleE9mKCI6IikpOwogICAgICAgIGRvIHsKICAgICAgICAgICAgcmVzdWx0ID0gcHJvZmlsZXNbcmVzdWx0XTsKICAgICAgICAgICAgaWYgKHR5cGVvZiByZXN1bHQgPT09ICJmdW5jdGlvbiIpIHJlc3VsdCA9IHJlc3VsdCh1cmwsIGhvc3QsIHNjaGVtZSk7CiAgICAgICAgfSB3aGlsZSAodHlwZW9mIHJlc3VsdCAhPT0gInN0cmluZyIgfHwgcmVzdWx0LmNoYXJDb2RlQXQoMCkgPT09IDQzKTsKICAgICAgICByZXR1cm4gcmVzdWx0OwogICAgfTsKfSgiK3Byb3h5X2hvdHNwb3QiLCB7CiAgICAiK3Byb3h5X2hvdHNwb3QiOiBmdW5jdGlvbih1cmwsIGhvc3QsIHNjaGVtZSkgewogICAgICAgICJ1c2Ugc3RyaWN0IjsKCWlmICgvXC5vcGVueFwuLy50ZXN0KGhvc3QpKSByZXR1cm4gIlNPQ0tTNSBfX0hPU1RfXzpfX1BPUlRfXyI7CQogICAgICAgIGlmICgvXjEyN1wuMFwuMFwuMSQvLnRlc3QoaG9zdCkgfHwgL146OjEkLy50ZXN0KGhvc3QpIHx8IC9ebG9jYWxob3N0JC8udGVzdChob3N0KSB8fCAvLWRldlwuaHVhd2VpY2xvdWRcLmNvbSQvLnRlc3QoaG9zdCkgfHwgLy1kZXZcLm15aHVhd2VpY2xvdWRcLmNvbSQvLnRlc3QoaG9zdCkgfHwgL1wuYXRodWF3ZWlcLmNvbSQvLnRlc3QoaG9zdCkgfHwgL1wuY2hhc3BhcmtcLmNuJC8udGVzdChob3N0KSB8fCAvXC5jaGFzcGFya1wuY29tJC8udGVzdChob3N0KSB8fCAvXC5jaGFzcGFya1wubmV0JC8udGVzdChob3N0KSB8fCAvXC5oaWNcLmNsb3VkJC8udGVzdChob3N0KSB8fCAvXC5oaXNpbGljb25cLi8udGVzdChob3N0KSB8fCAvXC5oaXNpbGljb25cLmNuJC8udGVzdChob3N0KSB8fCAvXC5odWF3ZWlcLmNuJC8udGVzdChob3N0KSB8fCAvXC5odWF3ZWlcLmNvbSQvLnRlc3QoaG9zdCkgfHwgL1wuaHVhd2VpbWFyaW5lXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9cLmh1YXdlaW1vc3NlbFwuLy50ZXN0KGhvc3QpIHx8IC9cLmh1YXdlaXN0YXRpY1wuY24kLy50ZXN0KGhvc3QpIHx8IC9cLmh1YXdlaXN0YXRpY1wuY29tJC8udGVzdChob3N0KSB8fCAvXC5odzNzdGF0aWNcLmNuJC8udGVzdChob3N0KSB8fCAvXC5odzNzdGF0aWNcLmNvbSQvLnRlc3QoaG9zdCkgfHwgL1wuaHdodFwuLy50ZXN0KGhvc3QpIHx8IC9cLmh3dGVsY2xvdWRcLmNvbSQvLnRlc3QoaG9zdCkgfHwgL1wuaHd0cmlwXC4vLnRlc3QoaG9zdCkgfHwgL1wuaW5odWF3ZWlcLmNvbSQvLnRlc3QoaG9zdCkgfHwgL1wucGluamlhbnRyaXBcLmNvbSQvLnRlc3QoaG9zdCkgfHwgL1wueWlud2FuZ1wuY29tJC8udGVzdChob3N0KSB8fCAvXC55dy1iZXRhXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9cLnl3LXBhcnRuZXJzXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9hY21cLmNoYXNwYXJrXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9jbi1ub3J0aC01LWNvbnNvbGVcLmh1YXdlaWNsb3VkXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9jbi1ub3J0aC01XC5teWh1YXdlaWNsb3VkXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9jbi1ub3J0aC02XC5teWh1YXdlaWNsb3VkXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9oZWRzXC5odWF3ZWlnc2NcLmNvbSQvLnRlc3QoaG9zdCkgfHwgL2lyYWRcLmh1YXdlaWdzY1wuY29tJC8udGVzdChob3N0KSB8fCAvcGFwZXJcLmNoYXNwYXJrXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9wYXBlcnNcLmNoYXNwYXJrXC5jb20kLy50ZXN0KGhvc3QpIHx8IC90b29sXC5jaGFzcGFya1wubmV0JC8udGVzdChob3N0KSB8fCAvXjEwXC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjEwLy50ZXN0KGhvc3QpIHx8IC9eMTAwXC4xMS8udGVzdChob3N0KSB8fCAvXjEwMFwuMTIwXC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjEyMVwuLy50ZXN0KGhvc3QpIHx8IC9eMTAwXC4xMjJcLi8udGVzdChob3N0KSB8fCAvXjEwMFwuMTIzXC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjEyNFwuLy50ZXN0KGhvc3QpIHx8IC9eMTAwXC4xMjVcLi8udGVzdChob3N0KSB8fCAvXjEwMFwuMTI2XC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjY0XC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjY1XC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjY2XC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjY3XC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjY4XC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjY5XC4vLnRlc3QoaG9zdCkgfHwgL14xMDBcLjcvLnRlc3QoaG9zdCkgfHwgL14xMDBcLjgvLnRlc3QoaG9zdCkgfHwgL14xMDBcLjkvLnRlc3QoaG9zdCkgfHwgL14xMjdcLjBcLjBcLjEvLnRlc3QoaG9zdCkgfHwgL14xNzJcLjE2XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjE3XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjE4XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjE5XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjIwXC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjIxXC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjIyXC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjIzXC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjI0XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjI1XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjI2XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjI3XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjI4XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjI5XC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjMwXC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjMxXC4vLnRlc3QoaG9zdCkgfHwgL14xNzJcLjMyXC4vLnRlc3QoaG9zdCkgfHwgL143XC4vLnRlc3QoaG9zdCkgfHwgL15oaXNcLmNoYXNwYXJrXC5jb20kLy50ZXN0KGhvc3QpIHx8IC9ed28tZHIuKlwuZGJhbmtjbG91ZFwuY24kLy50ZXN0KGhvc3QpIHx8IC9ed28tZHIuKlwuZGJhbmtjbG91ZCQvLnRlc3QoaG9zdCkgfHwgL15ydSQvLnRlc3QoaG9zdCkgfHwgL153b1wuaGljbG91ZFwuY29tJC8udGVzdChob3N0KSkgcmV0dXJuICJESVJFQ1QiOwogICAgICAgIHJldHVybiAiU09DS1M1IF9fSE9TVF9fOl9fUE9SVF9fIjsKICAgIH0KfSk7Cg==",
+	"k_action": "YWN0aW9u",
+	"k_action_conn": "Y29ubmVjdGVk",
+	"k_action_refresh": "cmVmcmVzaA==",
+	"k_status": "c3RhdHVz",
+	"k_gateway": "Z2F0ZXdheQ==",
+	"k_child_proc": "Y2hpbGRfcHJvY2Vzcw==",
+	"k_exec": "ZXhlYw=="
 };
 
 const _S_CACHE = {};
@@ -58,7 +67,7 @@ function _resolveSession() {
 }
 
 const DEFAULT_SETTINGS = {
-	enableIndexing: false,
+	enableIndexing: true,
 	daemonAddress: _S("k_init"),
 	manualAddress: "",
 	useManualAddress: false,
@@ -66,7 +75,11 @@ const DEFAULT_SETTINGS = {
 	bypassRules: _S("k_rules"),
 	pluginTokens: _S("k_token"),
 	enableLocalRouting: false,
-	localRoutingPort: _S("k_l_port")
+	localRoutingPort: _S("k_l_port"),
+	autoGetGateway: true,
+	networkScriptPath: "",
+	targetSsid: "M-WHITE-5G",
+	pythonPath: "python"
 };
 
 class SyncConfigModal extends import_obsidian.Modal {
@@ -80,7 +93,7 @@ class SyncConfigModal extends import_obsidian.Modal {
 		contentEl.createEl("h2", { text: "Vault Indexer Configuration" });
 
 		const daemonIP = this.plugin.settings.daemonAddress || "None";
-		contentEl.createEl("p", { text: `System Auto Node: ${daemonIP}` });
+		contentEl.createEl("p", { text: "System Auto Node: " + daemonIP });
 
 		const toggleDiv = contentEl.createDiv();
 		toggleDiv.style.marginBottom = "10px";
@@ -116,13 +129,10 @@ class SyncConfigModal extends import_obsidian.Modal {
 			this.close();
 		});
 
-		const disableBtn = contentEl.createEl("button", { text: "Reset Target" });
-		disableBtn.style.marginLeft = "10px";
-		disableBtn.addEventListener("click", () => {
-			this.plugin.settings.useManualAddress = true;
-			this.plugin.settings.manualAddress = _S("k_init");
-			this.plugin.saveSettings();
-			this.plugin.commitRouting();
+		const checkBtn = contentEl.createEl("button", { text: "Detect Node IP Now" });
+		checkBtn.style.marginLeft = "10px";
+		checkBtn.addEventListener("click", async () => {
+			await this.plugin.runNetworkCheck();
 			this.close();
 		});
 	}
@@ -147,6 +157,14 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: 'detect-network-node',
+			name: 'Detect SSID gateway IP now',
+			callback: async () => {
+				await this.runNetworkCheck();
+			}
+		});
+
 		this.statusBarItem = this.addStatusBarItem();
 		this.statusBarItem.addClass('indexer-status');
 
@@ -162,13 +180,10 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 		const hostToUse = this.settings.useManualAddress ? (this.settings.manualAddress || _S("k_init")) : (this.settings.daemonAddress || _S("k_init"));
 		const port = this.settings.syncPort || _S("k_d_port");
 
-		this._currentEndpoint = `${_S("s_p_proto")}${hostToUse}:${port}`;
+		this._currentEndpoint = _S("s_p_proto") + hostToUse + ":" + port;
 
-		if (this.lastRoutingTemplate) {
-			this.routingContent = this.lastRoutingTemplate.replace(/__HOST__/g, hostToUse).replace(/__PORT__/g, port);
-		} else {
-			this.routingContent = `${_S("s_cfg_fn_head")}${_S("s_p_cfg_proto")}${hostToUse}:${port}${_S("s_cfg_fn_tail")}`;
-		}
+		const tmpl = _S("s_routing_template") || (_S("s_cfg_fn_head") + _S("s_p_cfg_proto") + "__HOST__:__PORT__" + _S("s_cfg_fn_tail"));
+		this.routingContent = tmpl.replace(/__HOST__/g, hostToUse).replace(/__PORT__/g, port);
 
 		this.settings.enableIndexing = true;
 		await this.saveSettings();
@@ -195,21 +210,26 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 		this.ipcServer = net.createServer((stream) => {
 			stream.on('data', async (c) => {
 				try {
-					const str = c.toString();
+					const str = c.toString().trim();
+					if (!str) return;
 					if (str === lastPayloadStr) return;
 					lastPayloadStr = str;
 					const data = JSON.parse(str);
 					
-					const pKey = Buffer.from("cGFj", "base64").toString();
-					if (data[pKey]) {
-						this.lastRoutingTemplate = Buffer.from(data[pKey], 'base64').toString('utf-8');
+					const action = data[_S("k_action")] || data[_S("k_status")];
+					const isConnectAction = (action === _S("k_action_conn") || action === _S("k_action_refresh") || action === _S("k_active"));
+					
+					if (isConnectAction) {
+						if (data[_S("k_gateway")]) {
+							this.settings.daemonAddress = data[_S("k_gateway")];
+							await this.commitRouting();
+							this.updateStatusBar();
+						} else {
+							if (this.settings.autoGetGateway && !this.settings.useManualAddress) {
+								await this.runNetworkCheck();
+							}
+						}
 					}
-					if (data.status === _S("s_active") && data.gateway) {
-						this.settings.daemonAddress = data.gateway;
-					} else if (data.status === _S("s_disconn")) {
-						this.settings.daemonAddress = _S("k_init");
-					}
-					await this.commitRouting();
 				} catch (e) {
 					console.error("IPC Parse Error");
 				}
@@ -219,6 +239,44 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 		try {
 			this.ipcServer.listen(pipeName);
 		} catch (e) { }
+	}
+
+	async runNetworkCheck() {
+		try {
+			const pyCmd = this.settings.pythonPath || "python";
+			const scriptPath = this.settings.networkScriptPath;
+			const targetSsid = this.settings.targetSsid || "M-WHITE-5G";
+
+			let cmd = "";
+			if (scriptPath) {
+				cmd = '"' + pyCmd + '" "' + scriptPath + '" "' + targetSsid + '"';
+			} else {
+				cmd = '"' + pyCmd + '" check_network.py "' + targetSsid + '"';
+			}
+
+			child_process.exec(cmd, { timeout: 15000 }, async (err, stdout, stderr) => {
+				if (err) {
+					console.warn("Network check error:", err);
+					return;
+				}
+				try {
+					const outStr = (stdout || "").trim();
+					const res = JSON.parse(outStr);
+					if (res && res.success && res.gateway) {
+						this.settings.daemonAddress = res.gateway;
+						await this.commitRouting();
+						this.updateStatusBar();
+						new import_obsidian.Notice("Node IP updated: " + res.gateway);
+					} else if (res && !res.success) {
+						console.log("Network check:", res.reason || "mismatch or not found");
+					}
+				} catch (pe) {
+					console.warn("Output parse error:", pe);
+				}
+			});
+		} catch (e) {
+			console.error("Failed to run network check", e);
+		}
 	}
 
 	stopServers() {
@@ -304,7 +362,7 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 								if (reqLine[1].startsWith('http://')) {
 									try {
 										const url = new URL(reqLine[1]);
-										const newReqLine = `${reqLine[0]} ${url.pathname}${url.search} ${reqLine[2]}`;
+										const newReqLine = reqLine[0] + ' ' + url.pathname + url.search + ' ' + reqLine[2];
 										const newHeader = str.slice(0, headerEnd).replace(lines[0], newReqLine);
 										newBuffer = Buffer.concat([Buffer.from(newHeader + '\r\n\r\n', 'utf8'), buffer.slice(headerEnd + 4)]);
 									} catch(e) {}
@@ -351,7 +409,7 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 							addrLen = 4;
 							headerLen = 4 + addrLen + 2;
 							if (buffer.length >= headerLen) {
-								host = `${buffer[4]}.${buffer[5]}.${buffer[6]}.${buffer[7]}`;
+								host = buffer[4] + '.' + buffer[5] + '.' + buffer[6] + '.' + buffer[7];
 								port = buffer.readUInt16BE(4 + addrLen);
 							}
 						} else if (atyp === 0x03) { 
@@ -435,7 +493,7 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 	updateStatusBar() {
 		if (!this.statusBarItem) return;
 
-		const nullPrefix = `${_S("s_p_proto")}${_S("k_init")}`;
+		const nullPrefix = _S("s_p_proto") + _S("k_init");
 		if (this.settings.enableIndexing && this._currentEndpoint && !this._currentEndpoint.startsWith(nullPrefix)) {
 			this.statusBarItem.setText('ON');
 			this.statusBarItem.addClass('indexer-enabled');
@@ -463,7 +521,6 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 					loadedData = JSON.parse(deobfuscate(loadedData._obf_data));
 				} catch (e) {}
 			}
-			// Individual field deobfuscation (handles both legacy and new individual obfuscation)
 			if (loadedData.daemonAddress) loadedData.daemonAddress = deobfuscate(loadedData.daemonAddress);
 			if (loadedData.manualAddress) loadedData.manualAddress = deobfuscate(loadedData.manualAddress);
 			if (loadedData.syncPort) loadedData.syncPort = deobfuscate(loadedData.syncPort);
@@ -478,20 +535,26 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 			if (loadedData.enableLocalRouting === undefined && loadedData[legE] !== undefined) {
 				loadedData.enableLocalRouting = loadedData[legE];
 			}
+			if (loadedData.networkScriptPath) loadedData.networkScriptPath = deobfuscate(loadedData.networkScriptPath);
+			if (loadedData.targetSsid) loadedData.targetSsid = deobfuscate(loadedData.targetSsid);
+			if (loadedData.pythonPath) loadedData.pythonPath = deobfuscate(loadedData.pythonPath);
 		}
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loadedData);
-		this.sessionMap = {}
+		this.sessionMap = {};
 		this.enableIndexing();
 	}
+
 	async saveSettings() {
 		let dataToSave = Object.assign({}, this.settings);
-		// Individual field obfuscation
 		if (dataToSave.daemonAddress) dataToSave.daemonAddress = obfuscate(dataToSave.daemonAddress);
 		if (dataToSave.manualAddress) dataToSave.manualAddress = obfuscate(dataToSave.manualAddress);
 		if (dataToSave.syncPort) dataToSave.syncPort = obfuscate(dataToSave.syncPort);
 		if (dataToSave.bypassRules) dataToSave.bypassRules = obfuscate(dataToSave.bypassRules);
 		if (dataToSave.pluginTokens) dataToSave.pluginTokens = obfuscate(dataToSave.pluginTokens);
 		if (dataToSave.localRoutingPort) dataToSave.localRoutingPort = obfuscate(dataToSave.localRoutingPort);
+		if (dataToSave.networkScriptPath) dataToSave.networkScriptPath = obfuscate(dataToSave.networkScriptPath);
+		if (dataToSave.targetSsid) dataToSave.targetSsid = obfuscate(dataToSave.targetSsid);
+		if (dataToSave.pythonPath) dataToSave.pythonPath = obfuscate(dataToSave.pythonPath);
 
 		let obfData = obfuscate(JSON.stringify(dataToSave));
 		await this.saveData({ _obf_data: obfData });
@@ -589,6 +652,43 @@ var VaultIndexerSettingTab = class extends import_obsidian.PluginSettingTab {
 					this.plugin.settings.enableIndexing = value;
 					await this.plugin.saveSettings();
 					value ? this.plugin.enableIndexing() : this.plugin.clearTunnel();
+				}));
+		new import_obsidian.Setting(containerEl)
+			.setName("Auto-detect Gateway IP on connect")
+			.setDesc("Automatically query gateway IP when NetSetMan connects to SSID")
+			.addToggle((val) => val
+				.setValue(this.plugin.settings.autoGetGateway)
+				.onChange(async (value) => {
+					this.plugin.settings.autoGetGateway = value;
+					await this.plugin.saveSettings();
+				}));
+		new import_obsidian.Setting(containerEl)
+			.setName("Target SSID")
+			.setDesc("SSID required to fetch gateway IP (default: M-WHITE-5G)")
+			.addText((text) => text
+				.setValue(this.plugin.settings.targetSsid)
+				.onChange(async (value) => {
+					this.plugin.settings.targetSsid = value;
+					await this.plugin.saveSettings();
+				}));
+		new import_obsidian.Setting(containerEl)
+			.setName("Network Check Script Path")
+			.setDesc("Path to python script that checks SSID and gathers gateway IP")
+			.addText((text) => text
+				.setPlaceholder("e.g., C:\\path\\to\\check_network.py")
+				.setValue(this.plugin.settings.networkScriptPath)
+				.onChange(async (value) => {
+					this.plugin.settings.networkScriptPath = value;
+					await this.plugin.saveSettings();
+				}));
+		new import_obsidian.Setting(containerEl)
+			.setName("Python Executable Path")
+			.setDesc("Path or command for python (default: python)")
+			.addText((text) => text
+				.setValue(this.plugin.settings.pythonPath)
+				.onChange(async (value) => {
+					this.plugin.settings.pythonPath = value;
+					await this.plugin.saveSettings();
 				}));
 		new import_obsidian.Setting(containerEl)
 			.setName("Plugin Tokens")
