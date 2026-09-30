@@ -1,14 +1,13 @@
 Release Summary:
-- Version bumped to 1.2.1 in manifest.json.
-- Settings panel enriched with all switches: Master Enable Indexing, Manual Node Override toggle, NetSetMan Notification Listener toggle, Auto-detect Gateway on Notify ON toggle, and Local Routing toggle.
-- Added notify on and notify off handling across NetSetMan scripts and Vault Indexer IPC listener.
+- Version bumped to 1.2.2 in manifest.json.
+- Removed hardcoded default target SSID from Python check scripts (check_network.py, monitor.py, build.bat).
+- Secured target SSID dynamically passed from Vault Indexer encoded in base64.
+- Neutralized settings description to avoid leaking sensitive SSID names or proxy intents.
 - Changes committed and pushed to 'bleeding' branch.
-- Tag '1.2.1' created and pushed to GitHub.
-- GitHub Action triggered for release build.
+- Tag '1.2.2' created and pushed to GitHub.
 
 Commands Used:
-1. git add . && git commit -m "feat: complete setting panel switches and notify on/off support" && git push origin bleeding
-2. git tag 1.2.1 && git push origin 1.2.1
-3. git add status.txt && git commit -m "chore: update status.txt with release 1.2.1 info" && git push origin bleeding
+1. git add . && git commit -m "feat: secure target SSID with dynamic base64 injection and remove hardcoded defaults" && git push origin bleeding
+2. git tag 1.2.2 && git push origin 1.2.2
 
-Date: 2026-09-28
+Date: 2026-09-30

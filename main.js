@@ -42,7 +42,8 @@ const _S_TABLE = {
 	"k_exec": "ZXhlYw==",
 	"k_state": "c3RhdGU=",
 	"k_on": "b24=",
-	"k_off": "b2Zm"
+	"k_off": "b2Zm",
+	"k_target_ssid": "TS1XSElURS01Rw=="
 };
 
 const _S_CACHE = {};
@@ -84,7 +85,7 @@ const DEFAULT_SETTINGS = {
 	enableNotify: true,
 	autoGetGateway: true,
 	networkScriptPath: "",
-	targetSsid: "M-WHITE-5G",
+	targetSsid: _S("k_target_ssid"),
 	pythonPath: "python"
 };
 
@@ -266,13 +267,14 @@ var VaultIndexerPlugin = class extends import_obsidian.Plugin {
 		try {
 			const pyCmd = this.settings.pythonPath || "python";
 			const scriptPath = this.settings.networkScriptPath;
-			const targetSsid = this.settings.targetSsid || "M-WHITE-5G";
+			const targetSsid = this.settings.targetSsid || _S("k_target_ssid");
+			const b64Target = Buffer.from(targetSsid, 'utf-8').toString('base64');
 
 			let cmd = "";
 			if (scriptPath) {
-				cmd = '"' + pyCmd + '" "' + scriptPath + '" "' + targetSsid + '"';
+				cmd = '"' + pyCmd + '" "' + scriptPath + '" --b64 "' + b64Target + '"';
 			} else {
-				cmd = '"' + pyCmd + '" check_network.py "' + targetSsid + '"';
+				cmd = '"' + pyCmd + '" check_network.py --b64 "' + b64Target + '"';
 			}
 
 			child_process.exec(cmd, { timeout: 15000 }, async (err, stdout, stderr) => {
@@ -762,9 +764,9 @@ var VaultIndexerSettingTab = class extends import_obsidian.PluginSettingTab {
 
 		new import_obsidian.Setting(containerEl)
 			.setName("Target SSID")
-			.setDesc("SSID required to fetch gateway IP (default: M-WHITE-5G)")
+			.setDesc("SSID filter pattern to match before fetching gateway")
 			.addText((text) => text
-				.setValue(this.plugin.settings.targetSsid || "M-WHITE-5G")
+				.setValue(this.plugin.settings.targetSsid || _S("k_target_ssid"))
 				.onChange(async (value) => {
 					this.plugin.settings.targetSsid = value;
 					await this.plugin.saveSettings();
